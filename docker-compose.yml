@@ -1,0 +1,90 @@
+version: '3.7'
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx.dockerfile
+      args:
+        USER_ID: 1000
+        GROUP_ID: 1001
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+    #   - .docker/config/nginx:/etc/nginx/conf.d
+      - ${APP_PATH_HOST_BACK}:${APP_PATH_CONTAINER_BACK}
+    #working_dir: ${APP_PATH_CONTAINER_BACK}
+    #user: 1000:1000
+    depends_on:
+      - mariadb
+    # links:
+    #   - mariadb
+    #   - nodejs
+    networks:
+      - web
+
+  php:
+    build:
+      context: .
+      dockerfile: php.dockerfile
+      args:
+        APP_PATH_HOST_BACK: $APP_PATH_HOST_BACK
+        APP_PATH_CONTAINER_BACK: $APP_PATH_CONTAINER_BACK
+    restart: always
+    volumes:
+      - ${APP_PATH_HOST_BACK}:${APP_PATH_CONTAINER_BACK}
+    working_dir: ${APP_PATH_CONTAINER_BACK}
+    user: 1000:1000
+    depends_on:
+    - mariadb
+    # - redis
+    links:
+      - mariadb
+      # - redis
+    networks:
+      - web
+
+  mariadb:
+    image: mariadb:latest
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: test-parse
+      MYSQL_PASSWORD: password
+      MYSQL_DATABASE: test-parse
+    volumes:
+      - database:/var/lib/mysql
+    networks:
+      - web
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+    environment:
+      ADMINER_DEFAULT_SERVER: mariadb
+    networks:
+      - web
+
+  redis:
+    build:
+        context: .
+        dockerfile: redis.dockerfile
+    command: redis-server --save 20 1 --loglevel warning --requirepass password
+    ports:
+        - 6379:6379
+    restart: always
+    volumes:
+      - ${APP_PATH_HOST_REDIS}:${APP_PATH_CONTAINER_REDIS}
+      # - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - web
+
+volumes:
+   database:
+      
+networks:
+  web:
+    driver: bridge
